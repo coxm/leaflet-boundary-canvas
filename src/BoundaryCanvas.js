@@ -174,9 +174,9 @@
             zCoeff = Math.pow(2, zoom),
             ctx = canvas.getContext('2d'),
             imageObj = new Image(),
-            _this = this,
-            setPattern = function () {
-            
+            _this = this;
+
+        function setPattern() {
             var state = _this._getTileGeometry(tilePoint.x, tilePoint.y, zoom),
                 c, r, p,
                 pattern,
@@ -210,14 +210,42 @@
             ctx.rect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = pattern;
             ctx.fill();
-        };
+        }
         
         imageObj.onload = function () {
             setTimeout(setPattern, 0); //IE9 bug - black tiles appear randomly if call setPattern() without timeout
-        }
+        };
+        imageObj.onerror = this._tileOnError;
+
 		this._adjustTilePoint(tilePoint);
-        imageObj.src = this.getTileUrl(tilePoint);
-	}
+
+        var tmsAdjusted = tilePoint;
+        if (this.options.tms) {
+            var limit = this._getWrapTileNum();
+            // Get a fresh copy to avoid interfering with the tile point in
+            // setPattern's closure.
+            tmsAdjusted = new L.Point(
+                tilePoint.x,
+                limit.y - tilePoint.y - 1
+            );
+            tmsAdjusted.z = tilePoint.z;
+        }
+        imageObj.src = this.getTileUrl(tmsAdjusted);
+	},
+
+    _adjustTilePoint: function(tilePoint) {
+        var limit = this._getWrapTileNum();
+
+        // wrap tile coordinates
+        if (!this.options.continuousWorld && !this.options.noWrap) {
+            tilePoint.x = ((tilePoint.x % limit.x) + limit.x) % limit.x;
+        }
+
+        // Don't do anything about TMS correction here, because it interferes
+        // with the intersection code in drawTile.
+
+        tilePoint.z = this._getZoomForUrl();
+    }
 });
 
 L.TileLayer.boundaryCanvas = function (url, options) {
